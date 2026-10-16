@@ -171,6 +171,8 @@ code {
 
 .diff-line.removed { background: rgb(213 80 89 / 22%); color: #ffc4c9; }
 .diff-line.added { background: rgb(63 178 114 / 21%); color: #bbf3ce; }
+.diff-line.in-hunk { box-shadow: inset 4px 0 rgb(122 167 255 / 75%); }
+.diff-line.linked { background-color: rgb(70 130 255 / 60%); color: #fff; box-shadow: inset 4px 0 #b4ceff, inset 0 0 0 1px #9bbcff; }
 
 .function-card .react-flow__handle {
   width: 8px;

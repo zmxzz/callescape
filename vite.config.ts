@@ -1,30 +1,56 @@
 import { lstat, readdir, readFile, realpath, unlink } from 'node:fs/promises'
+import type { Dirent } from 'node:fs'
 import path from 'node:path'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin, type UserConfig, type ViteDevServer } from 'vite'
 import react from '@vitejs/plugin-react'
+import type { Graph } from './src/graph.ts'
 
 const virtualId = 'virtual:graph-files'
 const resolvedVirtualId = `\0${virtualId}`
 
-function isExcluded(name, isRoot) {
+export interface ReviewFilters {
+  include: string
+  exclude: string
+}
+
+export type AnalyzeReviewMode = (mode: string, filters: ReviewFilters) => Promise<Graph>
+
+export interface CallscapeOptions {
+  graphRoot?: string
+  reviewGraph?: Graph | null
+  reviewMode?: string | null
+  reviewFilters?: ReviewFilters | null
+  analyzeReviewMode?: AnalyzeReviewMode | null
+}
+
+interface GraphFile {
+  absolutePath: string
+  relativePath: string
+}
+
+function errorCode(error: unknown): string | undefined {
+  return error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code : undefined
+}
+
+function isExcluded(name: string, isRoot: boolean): boolean {
   return name.startsWith('.') || name === 'node_modules' || name === 'dist' ||
     (isRoot && (name === 'package.json' || name === 'package-lock.json'))
 }
 
-function compareEntries(a, b) {
+function compareEntries(a: Dirent, b: Dirent): number {
   return a.name < b.name ? -1 : a.name > b.name ? 1 : 0
 }
 
-function safeGraphPath(graphRoot, absolutePath) {
+function safeGraphPath(graphRoot: string, absolutePath: string): boolean {
   const relativePath = path.relative(graphRoot, absolutePath)
   if (!relativePath || path.isAbsolute(relativePath)) return false
   const segments = relativePath.split(path.sep)
   if (segments.some((segment) => !segment || segment === '..' || isExcluded(segment, false))) return false
   if (segments.length === 1 && ['package.json', 'package-lock.json'].includes(segments[0])) return false
-  return /\.json$/i.test(segments.at(-1))
+  return /\.json$/i.test(segments[segments.length - 1])
 }
 
-function resolveRequestedPath(graphRoot, requestedPath) {
+function resolveRequestedPath(graphRoot: string, requestedPath: string | null): string | null {
   if (typeof requestedPath !== 'string' || !requestedPath.startsWith('/') || requestedPath.startsWith('//') || requestedPath.includes('\\') || requestedPath.includes('\0')) {
     return null
   }
@@ -36,13 +62,13 @@ function resolveRequestedPath(graphRoot, requestedPath) {
   return safeGraphPath(graphRoot, absolutePath) ? absolutePath : null
 }
 
-function isInsideRoot(root, target) {
+function isInsideRoot(root: string, target: string): boolean {
   const relativePath = path.relative(root, target)
-  return relativePath && !relativePath.startsWith(`..${path.sep}`) && relativePath !== '..' && !path.isAbsolute(relativePath)
+  return Boolean(relativePath) && !relativePath.startsWith(`..${path.sep}`) && relativePath !== '..' && !path.isAbsolute(relativePath)
 }
 
-async function discover(graphRoot, directory = graphRoot, relativeDirectory = '') {
-  const files = []
+async function discover(graphRoot: string, directory = graphRoot, relativeDirectory = ''): Promise<GraphFile[]> {
+  const files: GraphFile[] = []
   const entries = (await readdir(directory, { withFileTypes: true })).sort(compareEntries)
 
   for (const entry of entries) {
@@ -60,7 +86,13 @@ async function discover(graphRoot, directory = graphRoot, relativeDirectory = ''
   return files
 }
 
-function graphFilesPlugin(graphRoot, reviewGraph, reviewMode, reviewFilters, analyzeReviewMode) {
+function graphFilesPlugin(
+  graphRoot: string,
+  reviewGraph: Graph | null,
+  reviewMode: string | null,
+  reviewFilters: ReviewFilters | null,
+  analyzeReviewMode: AnalyzeReviewMode | null,
+): Plugin {
   return {
     name: 'callscape-graph-files',
     resolveId(id) {
@@ -68,7 +100,7 @@ function graphFilesPlugin(graphRoot, reviewGraph, reviewMode, reviewFilters, ana
     },
     async load(id) {
       if (id !== resolvedVirtualId) return
-      const sources = {}
+      const sources: Record<string, string> = {}
       if (reviewGraph) {
         sources['/review.json'] = JSON.stringify(reviewGraph)
       } else {
@@ -86,7 +118,7 @@ function graphFilesPlugin(graphRoot, reviewGraph, reviewMode, reviewFilters, ana
         `export const initialReviewFilters = ${JSON.stringify(reviewFilters || { include: '', exclude: '' })};`,
       ].join('\n')
     },
-    configureServer(server) {
+    configureServer(server: ViteDevServer) {
       if (reviewGraph) {
         server.middlewares.use('/__callscape/review', async (request, response) => {
           if (request.method !== 'POST') {
@@ -102,9 +134,11 @@ function graphFilesPlugin(graphRoot, reviewGraph, reviewMode, reviewFilters, ana
                 return
               }
             }
-            const payload = JSON.parse(body)
-            const { mode, include = '', exclude = '' } = payload
-            if (!['uncommitted', 'last-commit', 'against-main'].includes(mode) && !(mode === 'custom' && reviewMode === 'custom')) {
+            const payload: unknown = JSON.parse(body)
+            const { mode, include = '', exclude = '' } = typeof payload === 'object' && payload !== null
+              ? payload as Record<string, unknown>
+              : {}
+            if (typeof mode !== 'string' || (!['uncommitted', 'last-commit', 'against-main'].includes(mode) && !(mode === 'custom' && reviewMode === 'custom'))) {
               response.writeHead(400).end('Unknown review comparison')
               return
             }
@@ -112,17 +146,18 @@ function graphFilesPlugin(graphRoot, reviewGraph, reviewMode, reviewFilters, ana
               response.writeHead(400).end('Invalid review file filters')
               return
             }
+            if (!analyzeReviewMode) throw new Error('Review analysis is not available')
             const graph = await analyzeReviewMode(mode, { include, exclude })
             response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
               .end(JSON.stringify(graph))
           } catch (error) {
-            response.writeHead(422).end(error.message)
+            response.writeHead(422).end(error instanceof Error ? error.message : String(error))
           }
         })
         return
       }
       server.watcher.add(graphRoot)
-      const refresh = (file) => {
+      const refresh = (file: string) => {
         if (!safeGraphPath(graphRoot, path.resolve(file))) return
         const module = server.moduleGraph.getModuleById(resolvedVirtualId)
         if (module) server.moduleGraph.invalidateModule(module)
@@ -138,7 +173,7 @@ function graphFilesPlugin(graphRoot, reviewGraph, reviewMode, reviewFilters, ana
           return
         }
 
-        const url = new URL(request.url, 'http://localhost')
+        const url = new URL(request.url ?? '', 'http://localhost')
         const target = resolveRequestedPath(graphRoot, url.searchParams.get('path'))
         if (!target) {
           response.writeHead(400).end('Invalid graph path')
@@ -159,7 +194,7 @@ function graphFilesPlugin(graphRoot, reviewGraph, reviewMode, reviewFilters, ana
           await unlink(target)
           response.writeHead(204).end()
         } catch (error) {
-          if (error.code === 'ENOENT') {
+          if (errorCode(error) === 'ENOENT') {
             response.writeHead(404).end('Graph file not found')
           } else {
             response.writeHead(500).end('Could not delete graph file')
@@ -176,7 +211,7 @@ export function createCallscapeConfig({
   reviewMode = null,
   reviewFilters = null,
   analyzeReviewMode = null,
-} = {}) {
+}: CallscapeOptions = {}): UserConfig {
   const resolvedRoot = path.resolve(graphRoot)
   return { plugins: [react(), graphFilesPlugin(resolvedRoot, reviewGraph, reviewMode, reviewFilters, analyzeReviewMode)] }
 }

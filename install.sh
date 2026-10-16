@@ -48,7 +48,7 @@ done
 
 if [ -z "$source_dir" ] && [ -z "$repo_url" ] && [ -f "${BASH_SOURCE[0]}" ]; then
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-  if [ -f "$script_dir/package.json" ] && [ -f "$script_dir/bin/callscape.mjs" ]; then
+  if [ -f "$script_dir/package.json" ] && [ -f "$script_dir/bin/callscape.mts" ]; then
     source_dir="$script_dir"
   fi
 fi
@@ -57,13 +57,13 @@ if [ -z "$source_dir" ] && [ -z "$repo_url" ]; then
   fail "No repository URL was provided. Use --repo URL, or run this script from a Callscape checkout."
 fi
 
-command -v node >/dev/null 2>&1 || fail "Node.js 20.19+ or 22.12+ is required"
+command -v node >/dev/null 2>&1 || fail "Node.js 22.18+ or 24+ is required"
 command -v npm >/dev/null 2>&1 || fail "npm is required"
-node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit((major === 20 && minor >= 19) || (major === 22 && minor >= 12) || major > 22 ? 0 : 1)' || fail "Node.js 20.19+ or 22.12+ is required (found $(node --version))"
+node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit((major === 22 && minor >= 18) || major >= 24 ? 0 : 1)' || fail "Node.js 22.18+ or 24+ is required (found $(node --version))"
 
 if [ -n "$source_dir" ]; then
   [ -d "$source_dir" ] || fail "Source directory does not exist: $source_dir"
-  [ -f "$source_dir/package-lock.json" ] && [ -f "$source_dir/bin/callscape.mjs" ] || fail "Source is not a Callscape checkout: $source_dir"
+  [ -f "$source_dir/package-lock.json" ] && [ -f "$source_dir/bin/callscape.mts" ] || fail "Source is not a Callscape checkout: $source_dir"
   command -v tar >/dev/null 2>&1 || fail "tar is required for a local install"
   source_dir="$(cd "$source_dir" && pwd -P)"
 else
@@ -77,7 +77,7 @@ bin_dir="$prefix/bin"
 current_link="$install_root/current"
 bin_link="$bin_dir/callscape"
 review_bin_link="$bin_dir/callescape"
-expected_bin_target="$current_link/bin/callscape.mjs"
+expected_bin_target="$current_link/bin/callscape.mts"
 codex_skills_dir="${CODEX_HOME:-$HOME/.codex}/skills"
 skill_link="$codex_skills_dir/callescape"
 if [ -n "$source_dir" ]; then
@@ -118,7 +118,7 @@ fi
 
 (cd "$stage/app" && npm ci --omit=dev --no-audit --no-fund)
 [ -d "$stage/app/node_modules/vite" ] && [ -d "$stage/app/node_modules/@vitejs/plugin-react" ] || fail "Runtime dependencies were not installed"
-node "$stage/app/bin/callscape.mjs" --help >/dev/null
+node "$stage/app/bin/callscape.mts" --help >/dev/null
 
 release_dir="$install_root/releases/$(date -u +%Y%m%d%H%M%S)-$$"
 mv "$stage/app" "$release_dir"

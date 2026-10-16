@@ -4,17 +4,19 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+    "node": "^22.18.0 || >=24.0.0"
   },
   "bin": {
-    "callscape": "bin/callscape.mjs",
-    "callescape": "bin/callscape.mjs"
+    "callscape": "bin/callscape.mts",
+    "callescape": "bin/callscape.mts"
   },
   "scripts": {
-    "app": "node bin/callscape.mjs",
+    "app": "node bin/callscape.mts",
     "dev": "vite",
     "build": "vite build",
-    "start": "vite preview"
+    "start": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@dagrejs/dagre": "^2.0.4",
@@ -24,5 +26,12 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "vite": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
   }
 }
