@@ -111,6 +111,24 @@ export function normalizeGraph(input: unknown): Graph {
   return { title: input.title || 'Untitled call graph', functions, calls }
 }
 
+export function mergeGraphs(graphs: Graph[]): Graph {
+  if (graphs.length === 0) throw new Error('No analyzer produced a graph.')
+  const ids = new Set<string>()
+  for (const graph of graphs) {
+    for (const func of graph.functions) {
+      if (ids.has(func.id)) throw new Error(`Duplicate function id across analyzers: ${func.id}`)
+      ids.add(func.id)
+    }
+  }
+  const populated = graphs.filter((graph) => graph.functions.length > 0)
+  const titled = populated.length > 0 ? populated : graphs.slice(0, 1)
+  return {
+    title: titled.map((graph) => graph.title).join(' · '),
+    functions: graphs.flatMap((graph) => graph.functions),
+    calls: graphs.flatMap((graph) => graph.calls),
+  }
+}
+
 export function parseGraph(source: string): Graph {
   return normalizeGraph(JSON.parse(source))
 }

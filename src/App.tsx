@@ -389,9 +389,9 @@ export default function App() {
             </select>
             <form className="review-file-filters" onSubmit={(event) => { event.preventDefault(); changeReviewMode(reviewMode) }}>
               <label htmlFor="review-include">Include</label>
-              <input id="review-include" type="text" value={includeFiles} onChange={(event) => setIncludeFiles(event.target.value)} placeholder="src/**/*.py" disabled={reviewLoading} />
+              <input id="review-include" type="text" value={includeFiles} onChange={(event) => setIncludeFiles(event.target.value)} placeholder="src/**" disabled={reviewLoading} />
               <label htmlFor="review-exclude">Exclude</label>
-              <input id="review-exclude" type="text" value={excludeFiles} onChange={(event) => setExcludeFiles(event.target.value)} placeholder="**/test_*.py" disabled={reviewLoading} />
+              <input id="review-exclude" type="text" value={excludeFiles} onChange={(event) => setExcludeFiles(event.target.value)} placeholder="**/tests/**" disabled={reviewLoading} />
               <span className="filter-hint">Comma-separated globs · blank includes all files</span>
               <button type="submit" disabled={reviewLoading}>Apply filters</button>
             </form>
@@ -418,7 +418,7 @@ export default function App() {
           </button>
           <div className="graph-heading">
             <div className="graph-summary">
-              <strong>{graph?.title || 'Callscape'}</strong>
+              <strong>{graph?.title || 'Callescape'}</strong>
               <span>{graph?.functions.length || 0} functions · {graph?.calls.length || 0} calls</span>
             </div>
             <div className="graph-path" title={absolutePath}>{absolutePath}</div>
@@ -434,7 +434,7 @@ export default function App() {
           </div>
         )}
         {graphReadOnly && graph?.functions.length === 0 ? (
-          <div className="empty-state">No changed Python functions in this comparison.</div>
+          <div className="empty-state">No changed functions in this comparison.</div>
         ) : graph ? <GraphCanvas key={`${activePath}-${direction}-${reviewMode}-${reviewRevision}`} graph={graph} direction={direction} /> : (
           <div className="empty-state">No valid graph JSON files in {graphRootName}.</div>
         )}

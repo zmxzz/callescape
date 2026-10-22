@@ -31,3 +31,6 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Personal Claude Code overrides
+.claude/settings.local.json

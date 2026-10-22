@@ -7,11 +7,11 @@
     "node": "^22.18.0 || >=24.0.0"
   },
   "bin": {
-    "callscape": "bin/callscape.mts",
-    "callescape": "bin/callscape.mts"
+    "callescape": "bin/callescape.mts",
+    "callscape": "bin/callescape.mts"
   },
   "scripts": {
-    "app": "node bin/callscape.mts",
+    "app": "node bin/callescape.mts",
     "dev": "vite",
     "build": "vite build",
     "start": "vite preview",
