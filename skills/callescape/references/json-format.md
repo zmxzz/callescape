@@ -1,4 +1,4 @@
-# Callscape JSON contract
+# Callescape JSON contract
 
 ```json
 {
@@ -33,7 +33,7 @@ Every call endpoint must refer to a function in its `functions` array.
 - `functions`: required array. Each entry needs a unique non-empty string `id` and at least one non-empty `before` or `after` behavior string. Optional `name` defaults to `id`; optional `file` defaults to an empty string.
 - `calls`: optional array. Each `from` and `to` is a function ID in `functions`; optional `label` is a compact string such as `before`, `after`, or a condition. Parallel calls are allowed.
 
-Function status follows populated sides: different populated sides mean modified, identical populated sides mean unchanged, only `after` means added, and only `before` means removed. Calls from a caller must appear in execution order. Callscape uses that order for edge numbers and sibling placement (left to right in vertical layout, top to bottom in horizontal layout). Labels must not contain the UI's sequence number. For modified and unchanged functions, hovering a line highlights its counterpart on the other side: the identical line, or for an edited line, the most similar line in its run of changes. That whole run is marked too, so a replaced line with no similar counterpart still shows what replaced it. Hovering a call edge highlights, in the caller, every line that mentions the callee's bare name as a whole identifier (the `name` up to its parameter list, after any qualifier such as `self.`), so a callee `name` should start with the identifier the caller's pseudocode actually uses.
+Function status follows populated sides: different populated sides mean modified, identical populated sides mean unchanged, only `after` means added, and only `before` means removed. Calls from a caller must appear in execution order. Callescape uses that order for edge numbers and sibling placement (left to right in vertical layout, top to bottom in horizontal layout). Labels must not contain the UI's sequence number. For modified and unchanged functions, hovering a line highlights its counterpart on the other side: the identical line, or for an edited line, the most similar line in its run of changes. That whole run is marked too, so a replaced line with no similar counterpart still shows what replaced it. Hovering a call edge highlights, in the caller, every line that mentions the callee's bare name as a whole identifier (the `name` up to its parameter list, after any qualifier such as `self.`), so a callee `name` should start with the identifier the caller's pseudocode actually uses.
 
 ## Pseudocode and diff
 
@@ -45,7 +45,7 @@ For each separate call tree, start the root function's populated sides with the 
 
 ## Files and workflow
 
-Save a UTF-8 `.json` file beneath the chosen graph folder. Callscape recursively discovers JSON files except hidden paths, `node_modules`, `dist`, and root package manifests. The primary command is `callscape [folder]`; it opens the browser and reloads when files change. If the command is unavailable, run `bash install.sh` from a local checkout or use the published-repository form documented in `README.md`. The installer also links this Codex skill. Its in-app delete action removes only a selected JSON file after confirmation. A static `npm run build` embeds the current files as a snapshot and cannot provide the live delete endpoint.
+Save a UTF-8 `.json` file beneath the chosen graph folder. Callescape recursively discovers JSON files except hidden paths, `node_modules`, `dist`, and root package manifests. The primary command is `callescape [folder]`; it opens the browser and reloads when files change. If the command is unavailable, run `bash install.sh` from a local checkout or use the published-repository form documented in `README.md`. The installer also links this Codex skill. Its in-app delete action removes only a selected JSON file after confirmation. A static `npm run build` embeds the current files as a snapshot and cannot provide the live delete endpoint.
 
 Unless the user requests another location, use `~/src/Planning/code-visualization` for generated graphs and return an absolute file link.
 

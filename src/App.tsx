@@ -418,7 +418,7 @@ export default function App() {
           </button>
           <div className="graph-heading">
             <div className="graph-summary">
-              <strong>{graph?.title || 'Callscape'}</strong>
+              <strong>{graph?.title || 'Callescape'}</strong>
               <span>{graph?.functions.length || 0} functions · {graph?.calls.length || 0} calls</span>
             </div>
             <div className="graph-path" title={absolutePath}>{absolutePath}</div>

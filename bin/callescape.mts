@@ -8,10 +8,10 @@ import { mergeGraphs, normalizeGraph, type Graph } from '../src/graph.ts'
 import type { AnalyzeReviewMode, ReviewFilters } from '../vite.config.ts'
 import { selectAnalyzers, splitLanguageOption, type Analyzer } from './analyzers.mts'
 
-const usage = `Usage: callscape [folder]
+const usage = `Usage: callescape [folder]
        callescape review [repo] [--base REV] [--head REV|worktree] [--include GLOBS] [--exclude GLOBS] [--lang LANGS]
 
-Start Callscape for graph JSON files, or review a Git diff in memory.
+Start Callescape for graph JSON files, or review a Git diff in memory.
 Review compares HEAD with the working tree by default and runs every language
 analyzer unless --lang narrows it. The Python analyzer requires Python 3.9+.`
 
@@ -171,7 +171,7 @@ async function main() {
 }
 
 main().catch((error: unknown) => {
-  console.error(`Callscape startup error: ${error instanceof Error ? error.message : String(error)}`)
+  console.error(`Callescape startup error: ${error instanceof Error ? error.message : String(error)}`)
   console.error(usage)
   process.exitCode = 1
 })

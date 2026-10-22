@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a conservative Callscape graph from two Git revisions of Python code."""
+"""Generate a conservative Callescape graph from two Git revisions of Python code."""
 
 import argparse
 import ast
