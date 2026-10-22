@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { callSiteLines, diffPseudocode, type DiffLine } from '../src/graph.ts'
+import { callSiteLines, diffPseudocode, mergeGraphs, type DiffLine } from '../src/graph.ts'
 
 const groups = (lines: DiffLine[]) => lines.map((line) => line.group)
 
@@ -122,4 +122,22 @@ test('a callee name without a parameter list is matched literally', () => {
 test('a method call site matches on the member name', () => {
   const lines = ['self.chargeCard(card)', 'gateway.charge(card)']
   expect(callSiteLines(lines, { id: 'c', name: 'Payments.chargeCard(card)' })).toEqual([0])
+})
+
+test('merging graphs concatenates functions and calls and keeps ids unique', () => {
+  const python = { title: 'Python changes', functions: [{ id: 'a.py:f', name: 'f()', file: 'a.py', before: '', after: 'x' }], calls: [] }
+  const other = { title: 'Go changes', functions: [{ id: 'a.go:g', name: 'g()', file: 'a.go', before: 'y', after: '' }], calls: [{ from: 'a.go:g', to: 'a.go:g', label: '' }] }
+  const merged = mergeGraphs([python, other])
+  expect(merged.functions.map((f) => f.id)).toEqual(['a.py:f', 'a.go:g'])
+  expect(merged.calls).toEqual(other.calls)
+  expect(merged.title).toBe('Python changes · Go changes')
+  expect(() => mergeGraphs([python, python])).toThrow(/a\.py:f/)
+})
+
+test('merging keeps the title of the only graph with functions', () => {
+  const empty = { title: 'Go changes', functions: [], calls: [] }
+  const python = { title: 'Python changes', functions: [{ id: 'a.py:f', name: 'f()', file: 'a.py', before: '', after: 'x' }], calls: [] }
+  expect(mergeGraphs([empty, python]).title).toBe('Python changes')
+  expect(mergeGraphs([empty]).title).toBe('Go changes')
+  expect(() => mergeGraphs([])).toThrow(/no analyzer/i)
 })

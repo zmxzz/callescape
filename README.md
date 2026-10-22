@@ -4,12 +4,12 @@ Callscape makes code changes easier to follow. It shows functions as a call grap
 
 There are two ways to use it:
 
-- `callescape review` opens a graph of changes in a Python Git repository. The graph lives in memory; you don't need to create a JSON file.
+- `callescape review` opens a graph of changes in a Git repository. The graph lives in memory; you don't need to create a JSON file. Python is the supported language today; other languages plug in as analyzers.
 - `callscape [folder]` opens Callscape graph JSON files you have saved or written yourself.
 
 ## Install
 
-You'll need Node.js 22.18+ or 24+ and npm. Python 3.9+ is needed only for `callescape review`.
+You'll need Node.js 22.18+ or 24+ and npm. Python 3.9+ is needed only for the Python analyzer behind `callescape review`.
 
 Install Callscape and the Codex authoring skill for your user account:
 
@@ -27,12 +27,12 @@ export PATH="$HOME/.local/bin:$PATH"
 
 Use `--prefix DIRECTORY` for another app installation location, `--source DIRECTORY` for another local checkout, or `--repo URL` for a published Git repository.
 
-## Review Python changes
+## Review Git changes
 
-Go to the Python repository you want to inspect and run:
+Go to the repository you want to inspect and run:
 
 ```bash
-cd /path/to/python-project
+cd /path/to/project
 callescape review
 ```
 
@@ -44,15 +44,17 @@ callescape review --base HEAD~1 --head HEAD
 
 In review mode, use the comparison dropdown at the top left to switch between uncommitted changes (`HEAD` versus the working tree), the last commit (`HEAD~1` versus `HEAD`), and changes against main (the merge base of `HEAD` and local `main`, or `origin/main`, versus the working tree). A comparison passed with `--base`, `--head`, or CLI file filters initially appears as “Custom comparison.” Switching choices recomputes the graph in memory without restarting the app. The last-commit choice requires a parent commit; the main choice requires a `main` or `origin/main` ref.
 
-The sidebar always shows **Include** and **Exclude** file filters in review mode. Enter comma-separated repository-relative globs, then choose **Apply filters** to rerun the selected comparison. The same patterns carry across comparison choices. For example, Include `src/**/*.py` and Exclude `**/test_*.py`. Blank Include matches all changed Python files; Exclude wins over Include. `*` and `?` match within one folder, `**` matches across folders, a bare filename matches at any depth, and a trailing `/` includes a folder's contents. Filters run before Python parsing, so excluded files are not analyzed. The same patterns can be passed to the command as `--include GLOBS --exclude GLOBS`.
+The sidebar always shows **Include** and **Exclude** file filters in review mode. Enter comma-separated repository-relative globs, then choose **Apply filters** to rerun the selected comparison. The same patterns carry across comparison choices. For example, Include `src/**/*.py` and Exclude `**/test_*.py`. Blank Include matches all changed files; Exclude wins over Include. `*` and `?` match within one folder, `**` matches across folders, a bare filename matches at any depth, and a trailing `/` includes a folder's contents. Filters run before parsing, so excluded files are not analyzed. The same patterns can be passed to the command as `--include GLOBS --exclude GLOBS`.
 
 You can also pass the repository path, so you don't have to change directories:
 
 ```bash
-callescape review /path/to/python-project
+callescape review /path/to/project
 ```
 
-Review reads Python source but never runs it. It parses only changed Python files and shows functions whose source was modified, added, or removed. Calls are drawn only when both functions are shown; unchanged callers and callees are omitted. Import-only edits that leave function source identical do not produce function nodes. Because Python can choose call targets at runtime, Callscape leaves calls it cannot resolve out of the graph rather than guessing. Renamed functions appear as a removal and an addition. Switch comparisons or restart the command to pick up newer edits.
+Review runs every installed language analyzer and merges their graphs. Pass `--lang python` (comma-separated for several) to run only some of them; an unknown language is an error.
+
+The Python analyzer reads Python source but never runs it. It parses only changed Python files and shows functions whose source was modified, added, or removed. Calls are drawn only when both functions are shown; unchanged callers and callees are omitted. Import-only edits that leave function source identical do not produce function nodes. Because Python can choose call targets at runtime, Callscape leaves calls it cannot resolve out of the graph rather than guessing. Renamed functions appear as a removal and an addition. Switch comparisons or restart the command to pick up newer edits.
 
 Nothing is saved to the repository: the review graph stays in memory, and the delete button is disabled in review mode.
 
@@ -107,3 +109,7 @@ npm run dev
 `npm run dev` uses the checkout as its graph folder unless you set `CALLSCAPE_GRAPH_ROOT`. `npm run build` creates a static snapshot in `dist/`; that build does not watch graph files or provide the delete endpoint. For the full folder workflow, use `callscape [folder]`.
 
 Run the JavaScript tests with `npm test` (Vitest) and the Python review tests with `python3 -m unittest discover -s tests -v`. There is no lint script.
+
+### Add a language analyzer
+
+An analyzer is a program that reads a Git repository and prints one JSON object. Register it in `bin/analyzers.mts` with its language name, the command that runs it, and its script path. The CLI runs every registered analyzer with the same arguments and merges the graphs, so each analyzer must ignore files outside its language and must prefix function ids with the file path so ids never collide. The exact arguments and output are in [the JSON contract](skills/callescape/references/json-format.md#analyzer-contract).
