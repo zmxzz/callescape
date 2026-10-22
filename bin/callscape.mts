@@ -4,6 +4,8 @@ import { stat } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { normalizeGraph, type Graph } from '../src/graph.ts'
+import type { AnalyzeReviewMode, ReviewFilters } from '../vite.config.ts'
 
 const usage = `Usage: callscape [folder]
        callescape review [repo] [--base REV] [--head REV|worktree] [--include GLOBS] [--exclude GLOBS]
@@ -11,13 +13,24 @@ const usage = `Usage: callscape [folder]
 Start Callscape for graph JSON files, or review a Python Git diff in memory.
 Review compares HEAD with the working tree by default and requires Python 3.9+.`
 
-async function runCommand(command, arguments_) {
+interface ReviewSession {
+  graph: Graph
+  initialMode: string
+  initialFilters: ReviewFilters
+  analyzeMode: AnalyzeReviewMode
+}
+
+function errorCode(error: unknown): string | undefined {
+  return error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code : undefined
+}
+
+async function runCommand(command: string, arguments_: string[]) {
   const child = spawn(command, arguments_, { stdio: ['ignore', 'pipe', 'pipe'] })
-  const stdout = []
-  const stderr = []
-  child.stdout.on('data', (chunk) => stdout.push(chunk))
-  child.stderr.on('data', (chunk) => stderr.push(chunk))
-  const code = await new Promise((resolve, reject) => {
+  const stdout: Buffer[] = []
+  const stderr: Buffer[] = []
+  child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk))
+  child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk))
+  const code = await new Promise<number | null>((resolve, reject) => {
     child.on('error', reject)
     child.on('close', resolve)
   })
@@ -28,18 +41,20 @@ async function runCommand(command, arguments_) {
   }
 }
 
-async function analyze(arguments_) {
+async function analyze(arguments_: string[]): Promise<{ repository: string; graph: Graph }> {
   const script = fileURLToPath(new URL('../scripts/generate_python_diff.py', import.meta.url))
   const result = await runCommand('python3', [script, ...arguments_])
   if (result.stderr) process.stderr.write(result.stderr)
   if (result.code !== 0) throw new Error(result.stderr.trim() || `Python analysis exited with status ${result.code}`)
-  const { repository, graph } = JSON.parse(result.stdout)
-  const { normalizeGraph } = await import('../src/graph.js')
-  normalizeGraph(graph)
-  return { repository, graph }
+  const payload: unknown = JSON.parse(result.stdout)
+  if (typeof payload !== 'object' || payload === null || typeof (payload as Record<string, unknown>).repository !== 'string') {
+    throw new Error('Python analysis returned an unexpected result')
+  }
+  const { repository, graph } = payload as { repository: string; graph: unknown }
+  return { repository, graph: normalizeGraph(graph) }
 }
 
-async function mainBase(repository) {
+async function mainBase(repository: string): Promise<string> {
   for (const ref of ['refs/heads/main', 'refs/remotes/origin/main']) {
     const result = await runCommand('git', ['-C', repository, 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`])
     if (result.code === 0) {
@@ -51,7 +66,7 @@ async function mainBase(repository) {
   throw new Error('No main or origin/main branch found in this repository')
 }
 
-async function review(arguments_) {
+async function review(arguments_: string[]) {
   if (arguments_.length === 1 && ['--help', '-h'].includes(arguments_[0])) {
     console.log(usage)
     return
@@ -61,14 +76,14 @@ async function review(arguments_) {
     ['--base', '--head', '--include', '--exclude'].includes(argument) ||
     ['--base=', '--head=', '--include=', '--exclude='].some((option) => argument.startsWith(option))
   ) ? 'custom' : 'uncommitted'
-  const initialFilters = { include: '', exclude: '' }
+  const initialFilters: ReviewFilters = { include: '', exclude: '' }
   for (const [index, argument] of arguments_.entries()) {
-    for (const name of ['include', 'exclude']) {
+    for (const name of ['include', 'exclude'] as const) {
       if (argument === `--${name}`) initialFilters[name] = arguments_[index + 1] || ''
       if (argument.startsWith(`--${name}=`)) initialFilters[name] = argument.slice(name.length + 3)
     }
   }
-  const analyzeMode = async (mode, { include = '', exclude = '' } = {}) => {
+  const analyzeMode: AnalyzeReviewMode = async (mode, { include = '', exclude = '' } = { include: '', exclude: '' }) => {
     const filters = ['--include', include, '--exclude', exclude]
     if (mode === 'custom' && initialMode === 'custom') return (await analyze([...arguments_, ...filters])).graph
     if (mode === 'uncommitted') return (await analyze([initial.repository, ...filters])).graph
@@ -82,10 +97,10 @@ async function review(arguments_) {
   await startServer(initial.repository, { graph: initial.graph, initialMode, initialFilters, analyzeMode })
 }
 
-async function startServer(graphRoot, review = null) {
+async function startServer(graphRoot: string, review: ReviewSession | null = null) {
   const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
   const { createServer } = await import('vite')
-  const { createCallscapeConfig } = await import('../vite.config.js')
+  const { createCallscapeConfig } = await import('../vite.config.ts')
   const server = await createServer({
     root: appRoot,
     configFile: false,
@@ -130,7 +145,7 @@ async function main() {
   try {
     directory = await stat(graphRoot)
   } catch (error) {
-    if (error.code === 'ENOENT') {
+    if (errorCode(error) === 'ENOENT') {
       throw new Error(`Folder does not exist: ${graphRoot}`)
     }
     throw error
@@ -143,8 +158,8 @@ async function main() {
   await startServer(graphRoot)
 }
 
-main().catch((error) => {
-  console.error(`Callscape startup error: ${error.message}`)
+main().catch((error: unknown) => {
+  console.error(`Callscape startup error: ${error instanceof Error ? error.message : String(error)}`)
   console.error(usage)
   process.exitCode = 1
 })
