@@ -1,17 +1,15 @@
 # Callescape
 
-Callescape makes code changes easier to follow. It shows functions as a call graph, with their before-and-after code side by side. Arrows show who calls whom, in call order.
+Callescape shows a code change as a call graph. Each changed function is a card with its before and after source side by side, and arrows show who calls whom, in call order.
 
-There are two ways to use it:
+Two ways to use it:
 
-- `callescape review` opens a graph of changes in a Git repository. The graph lives in memory; you don't need to create a JSON file. Python is the supported language today; other languages plug in as analyzers.
-- `callescape [folder]` opens Callescape graph JSON files you have saved or written yourself.
+- `callescape review` builds the graph from a Git diff and keeps it in memory. Python is supported today; other languages plug in as analyzers.
+- `callescape [folder]` opens graph JSON files you saved or wrote yourself.
 
 ## Install
 
-You'll need Node.js 22.18+ or 24+ and npm. Python 3.9+ is needed only for the Python analyzer behind `callescape review`.
-
-Install Callescape and the Codex authoring skill for your user account:
+Requires Node.js 22.18+ or 24+ and npm. Python 3.9+ is needed only for the Python analyzer.
 
 ```bash
 git clone git@github.com:zmxzz/callescape.git
@@ -19,56 +17,47 @@ cd callescape
 bash install.sh
 ```
 
-The installer installs runtime dependencies, adds `callescape` under `~/.local/bin` (plus `callscape` as an alias for the older spelling), and links the Codex skill under `~/.codex/skills/callescape`. From a checkout, the skill link points to the canonical `skills/callescape` directory so edits stay current. The installer respects `CODEX_HOME` and won't overwrite unrelated commands or skills. If your shell can't find the commands, add the bin directory to your `PATH`:
+The installer puts `callescape` in `~/.local/bin` (with `callscape` as an alias for the older spelling) and links the Codex skill at `~/.codex/skills/callescape`. It respects `CODEX_HOME` and never overwrites commands or skills it did not create. If the command is not found, add the bin directory to your `PATH`:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Use `--prefix DIRECTORY` for another app installation location, `--source DIRECTORY` for another local checkout, or `--repo URL` for a published Git repository.
+Options: `--prefix DIR` installs elsewhere, `--source DIR` installs from another checkout, `--repo URL` installs from a published repository.
 
 ## Review Git changes
 
-Go to the repository you want to inspect and run:
-
 ```bash
 cd /path/to/project
-callescape review
-```
-
-This compares the current working tree with `HEAD` and opens the graph in your browser. To compare two commits instead:
-
-```bash
+callescape review                          # working tree vs HEAD
 callescape review --base HEAD~1 --head HEAD
+callescape review /path/to/project         # without cd
 ```
 
-In review mode, use the comparison dropdown at the top left to switch between uncommitted changes (`HEAD` versus the working tree), the last commit (`HEAD~1` versus `HEAD`), and changes against main (the merge base of `HEAD` and local `main`, or `origin/main`, versus the working tree). A comparison passed with `--base`, `--head`, or CLI file filters initially appears as “Custom comparison.” Switching choices recomputes the graph in memory without restarting the app. The last-commit choice requires a parent commit; the main choice requires a `main` or `origin/main` ref.
+The graph opens in your browser. The **Compare** dropdown switches between:
 
-The sidebar always shows **Include** and **Exclude** file filters in review mode. Enter comma-separated repository-relative globs, then choose **Apply filters** to rerun the selected comparison. The same patterns carry across comparison choices. For example, Include `src/**/*.py` and Exclude `**/test_*.py`. Blank Include matches all changed files; Exclude wins over Include. `*` and `?` match within one folder, `**` matches across folders, a bare filename matches at any depth, and a trailing `/` includes a folder's contents. Filters run before parsing, so excluded files are not analyzed. The same patterns can be passed to the command as `--include GLOBS --exclude GLOBS`.
+- **Uncommitted changes**: `HEAD` vs the working tree.
+- **Last commit**: `HEAD~1` vs `HEAD`. Needs a parent commit.
+- **Changes against main**: merge base of `HEAD` and `main` (or `origin/main`) vs the working tree. Needs that ref.
+- **Custom comparison**: whatever `--base`, `--head`, or filters you passed on the command line.
 
-You can also pass the repository path, so you don't have to change directories:
+Switching recomputes the graph in memory. Rerun the comparison to pick up newer edits.
 
-```bash
-callescape review /path/to/project
-```
+**Include** and **Exclude** take comma-separated, repository-relative globs and apply to every comparison. Blank Include means all files; Exclude wins. `*` and `?` match within one folder, `**` matches across folders, a bare filename matches at any depth, and a trailing `/` includes a folder's contents. Excluded files are never parsed. The same patterns can be passed as `--include GLOBS --exclude GLOBS`.
 
-Review runs every installed language analyzer and merges their graphs. Pass `--lang python` (comma-separated for several) to run only some of them; an unknown language is an error.
+Review runs every registered language analyzer and merges their graphs. `--lang python` (comma-separated for several) runs only those; an unknown language is an error.
 
-The Python analyzer reads Python source but never runs it. It parses only changed Python files and shows functions whose source was modified, added, or removed. Calls are drawn only when both functions are shown; unchanged callers and callees are omitted. Import-only edits that leave function source identical do not produce function nodes. Because Python can choose call targets at runtime, Callescape leaves calls it cannot resolve out of the graph rather than guessing. Renamed functions appear as a removal and an addition. Switch comparisons or restart the command to pick up newer edits.
-
-Nothing is saved to the repository: the review graph stays in memory, and the delete button is disabled in review mode.
+The Python analyzer parses source with `ast` and never runs it. It shows only functions whose source changed, and draws a call only when both ends are shown. Calls it cannot resolve statically are left out rather than guessed. Renames appear as a removal plus an addition. Nothing is written to the repository, and the delete button is disabled in review mode.
 
 ## Open saved graphs
-
-If you have Callescape JSON files, point the viewer at their folder:
 
 ```bash
 callescape /path/to/graphs
 ```
 
-Or run `callescape` from inside that folder. The app finds JSON files in subfolders, shows them in the sidebar, and reloads when they change. You can delete a selected graph file from the sidebar after confirming. Hidden folders, `node_modules`, `dist`, and root package manifests are skipped; deletion is restricted to JSON files inside the chosen folder.
+Or run `callescape` inside the folder. It finds JSON files in subfolders, lists them in the sidebar, and reloads when they change. Hidden folders, `node_modules`, `dist`, and root package manifests are skipped. Deleting a file from the sidebar asks for confirmation and only works on JSON files inside the chosen folder.
 
-A small graph looks like this:
+A small graph:
 
 ```json
 {
@@ -95,21 +84,20 @@ A small graph looks like this:
 }
 ```
 
-Each function needs a unique `id` and a nonempty `before` or `after` side. Keep unchanged lines identical on both sides so they stay neutral; removed lines appear red and added lines green. Put each caller's `calls` in call order. See [example.json](example.json) for a fuller example and [the JSON format reference](skills/callescape/references/json-format.md) for all fields and conventions.
+Each function needs a unique `id` and a nonempty `before` or `after`. Keep unchanged lines identical on both sides so they render neutral. List each caller's `calls` in call order. See [example.json](example.json) and [the JSON contract](skills/callescape/references/json-format.md).
 
 ## Work on Callescape
 
-From the repository checkout:
-
 ```bash
 npm install
-npm run dev
+npm run dev                                    # graph folder = checkout, or $CALLSCAPE_GRAPH_ROOT
+npm test                                       # Vitest
+python3 -m unittest discover -s tests -v       # Python analyzer tests
+npm run build                                  # static snapshot in dist/, no watching or delete endpoint
 ```
 
-`npm run dev` uses the checkout as its graph folder unless you set `CALLSCAPE_GRAPH_ROOT`. `npm run build` creates a static snapshot in `dist/`; that build does not watch graph files or provide the delete endpoint. For the full folder workflow, use `callescape [folder]`.
-
-Run the JavaScript tests with `npm test` (Vitest) and the Python review tests with `python3 -m unittest discover -s tests -v`. There is no lint script.
+There is no lint script.
 
 ### Add a language analyzer
 
-An analyzer is a program that reads a Git repository and prints one JSON object. Register it in `bin/analyzers.mts` with its language name, the command that runs it, and its script path. The CLI runs every registered analyzer with the same arguments and merges the graphs, so each analyzer must ignore files outside its language and must prefix function ids with the file path so ids never collide. The exact arguments and output are in [the JSON contract](skills/callescape/references/json-format.md#analyzer-contract).
+Register the language, command, and script path in `bin/analyzers.mts`. The CLI runs every analyzer with the same arguments and merges the results, so an analyzer must ignore other languages and prefix function ids with the file path. The exact arguments and output are in [the analyzer contract](skills/callescape/references/json-format.md#analyzer-contract).
